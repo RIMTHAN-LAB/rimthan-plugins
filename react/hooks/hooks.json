@@ -1,0 +1,10 @@
+{
+  "beforeWrite": {
+    "command": "npm run lint:fix",
+    "description": "Auto-fix linting issues before writing files"
+  },
+  "afterEdit": {
+    "command": "npm run type-check",
+    "description": "Check TypeScript types after editing"
+  }
+}

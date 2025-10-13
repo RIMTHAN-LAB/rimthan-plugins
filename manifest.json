@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "stacks": {
+    "react": {
+      "name": "React",
+      "description": "Claude Code plugin for React development with TypeScript",
+      "version": "1.0.0",
+      "files": [
+        ".claude-plugin/plugin.json",
+        "commands/component.md",
+        "commands/hook.md",
+        "commands/test.md",
+        "agents/react-expert.md",
+        "hooks/hooks.json"
+      ]
+    },
+    "flutter": {
+      "name": "Flutter",
+      "description": "Claude Code plugin for Flutter development with Dart",
+      "version": "1.0.0",
+      "files": [
+        ".claude-plugin/plugin.json",
+        "commands/widget.md",
+        "commands/screen.md",
+        "commands/model.md",
+        "agents/flutter-expert.md"
+      ]
+    },
+    "nodejs": {
+      "name": "Node.js",
+      "description": "Claude Code plugin for Node.js backend development",
+      "version": "1.0.0",
+      "files": [
+        ".claude-plugin/plugin.json",
+        "commands/api.md",
+        "commands/middleware.md",
+        "commands/model.md",
+        "agents/nodejs-expert.md",
+        "hooks/hooks.json"
+      ]
+    }
+  }
+}

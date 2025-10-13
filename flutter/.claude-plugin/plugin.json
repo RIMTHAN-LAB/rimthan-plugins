@@ -1,0 +1,8 @@
+{
+  "name": "flutter-plugin",
+  "displayName": "Flutter Development Plugin",
+  "description": "Custom commands and agents for Flutter development with Dart",
+  "version": "1.0.0",
+  "author": "RIMTHAN-LAB",
+  "repository": "https://github.com/RIMTHAN-LAB/rimthan-plugins"
+}
