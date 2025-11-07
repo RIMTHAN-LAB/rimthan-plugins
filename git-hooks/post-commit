@@ -270,14 +270,14 @@ APPLESCRIPT
     echo "   Monitor: tail -f $LOGS_DIR/claude_update_${SESSION_ID}.json"
 
     # Launch background update script
-    .husky/scripts/claude-update-docs.sh "$SESSION_ID" &
+    "$HUSKY_DIR/scripts/claude-update-docs.sh" "$SESSION_ID" &
 
     # Show initial notification (cross-platform)
     send_notification "Claude Code" "Updating CLAUDE.md files in background..."
   else
     echo -e "${YELLOW}⏭️  Skipped automatic update${NC}"
     echo -e "${GREEN}💡 You can manually update or re-run with:${NC}"
-    echo -e "${GREEN}   .husky/scripts/claude-update-docs.sh $SESSION_ID${NC}"
+    echo -e "${GREEN}   $HUSKY_DIR/scripts/claude-update-docs.sh $SESSION_ID${NC}"
   fi
 
 elif echo "$CLAUDE_RESULT" | grep -q "NO_UPDATE_NEEDED"; then
