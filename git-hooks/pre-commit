@@ -1,0 +1,36 @@
+#!/bin/bash
+# Universal Pre-Commit Hook
+# Runs linting and type checking for changed tech stacks
+
+# Source utilities
+HUSKY_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$HUSKY_DIR/lib/detect-env.sh"
+source "$HUSKY_DIR/lib/config.sh"
+
+# Check if pre-commit is enabled
+if ! is_enabled "preCommit"; then
+    exit 0
+fi
+
+# Detect changed tech stacks
+stacks=$(detect_changed_stacks)
+
+if [ -z "$stacks" ]; then
+    echo "No code changes detected"
+    exit 0
+fi
+
+echo "🔍 Detected tech stacks: $(echo $stacks | tr '\n' ' ')"
+
+# Run lint-staged if it exists (handles JavaScript/TypeScript)
+if echo "$stacks" | grep -q "javascript"; then
+    if [ -f "package.json" ] && grep -q '"lint-staged"' package.json; then
+        echo "📝 Running lint-staged for JavaScript/TypeScript..."
+        npx lint-staged || exit 1
+    fi
+fi
+
+# TODO: Add Go, Dart, Python linting in future iterations
+# For now, JavaScript/TypeScript projects work as before
+
+exit 0

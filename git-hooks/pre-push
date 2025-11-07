@@ -1,0 +1,109 @@
+#!/bin/bash
+# Universal Pre-Push Hook
+# Runs tests and builds for affected tech stacks
+
+# Source utilities
+HUSKY_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$HUSKY_DIR/lib/detect-env.sh"
+source "$HUSKY_DIR/lib/config.sh"
+
+# Check if pre-push is enabled
+if ! is_enabled "prePush"; then
+    exit 0
+fi
+
+# Detect tech stacks in repository
+stacks=$(detect_stacks)
+
+if [ -z "$stacks" ]; then
+    echo "No recognized tech stacks detected"
+    exit 0
+fi
+
+echo "🚀 Running pre-push checks for: $(echo $stacks | tr '\n' ' ')"
+
+# JavaScript/TypeScript: run tests and build
+if echo "$stacks" | grep -q "javascript"; then
+    if [ -f "package.json" ]; then
+        pkg_mgr=$(detect_package_manager)
+
+        # Check if test script exists
+        if grep -q '"test"' package.json | grep -v '"test":.*"echo'; then
+            echo "🧪 Running tests with $pkg_mgr..."
+            case "$pkg_mgr" in
+                npm)
+                    npm test || exit 1
+                    ;;
+                yarn)
+                    yarn test || exit 1
+                    ;;
+                pnpm)
+                    pnpm test || exit 1
+                    ;;
+                bun)
+                    bun test || exit 1
+                    ;;
+            esac
+        fi
+
+        # Check if build script exists
+        if grep -q '"build"' package.json; then
+            echo "🏗️  Building with $pkg_mgr..."
+            case "$pkg_mgr" in
+                npm)
+                    npm run build || exit 1
+                    ;;
+                yarn)
+                    yarn build || exit 1
+                    ;;
+                pnpm)
+                    pnpm build || exit 1
+                    ;;
+                bun)
+                    bun run build || exit 1
+                    ;;
+            esac
+        fi
+    fi
+fi
+
+# Go: run tests and build
+if echo "$stacks" | grep -q "go"; then
+    if [ -f "go.mod" ]; then
+        echo "🧪 Running Go tests..."
+        go test ./... || exit 1
+
+        echo "🏗️  Building Go project..."
+        go build ./... || exit 1
+    fi
+fi
+
+# Dart/Flutter: run tests
+if echo "$stacks" | grep -qE "(dart|flutter)"; then
+    if [ -f "pubspec.yaml" ]; then
+        if grep -q "flutter:" pubspec.yaml; then
+            echo "🧪 Running Flutter tests..."
+            flutter test || exit 1
+        else
+            echo "🧪 Running Dart tests..."
+            dart test || exit 1
+        fi
+    fi
+fi
+
+# Python: run tests if pytest is available
+if echo "$stacks" | grep -q "python"; then
+    if command -v pytest &> /dev/null; then
+        echo "🧪 Running Python tests..."
+        pytest || exit 1
+    elif command -v python3 &> /dev/null; then
+        # Try unittest discovery
+        if python3 -m unittest discover &> /dev/null; then
+            echo "🧪 Running Python tests with unittest..."
+            python3 -m unittest discover || exit 1
+        fi
+    fi
+fi
+
+echo "✅ All pre-push checks passed!"
+exit 0

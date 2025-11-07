@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "description": "Configuration for Rimthan universal Git hooks",
+  "enabled": {
+    "preCommit": true,
+    "postCommit": true,
+    "prePush": true
+  },
+  "detection": {
+    "auto": true,
+    "stacks": []
+  },
+  "logs": {
+    "directory": ".rimthan_cli"
+  },
+  "claude": {
+    "model": "sonnet",
+    "maxTurns": 15,
+    "enableAutoUpdate": true
+  },
+  "notifications": {
+    "enabled": true
+  }
+}

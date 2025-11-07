@@ -1,0 +1,291 @@
+#!/bin/bash
+
+# Auto-check CLAUDE.md documentation after commits
+# This runs Claude CLI in headless mode to analyze if docs need updating
+
+# Source utilities
+HUSKY_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$HUSKY_DIR/lib/detect-env.sh"
+source "$HUSKY_DIR/lib/platform.sh"
+source "$HUSKY_DIR/lib/config.sh"
+
+# Check if post-commit is enabled
+if ! is_enabled "postCommit"; then
+    exit 0
+fi
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Get commit info
+COMMIT_HASH=$(git rev-parse HEAD)
+COMMIT_MSG=$(git log -1 --pretty=%B)
+CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
+
+# Detect tech stacks from committed files (not staged files)
+stacks=()
+if echo "$CHANGED_FILES" | grep -qE '\.(js|jsx|ts|tsx|mjs|cjs|mts|cts)$|package\.json'; then
+    stacks+=("javascript")
+fi
+if echo "$CHANGED_FILES" | grep -qE '\.go$|go\.(mod|sum)'; then
+    stacks+=("go")
+fi
+if echo "$CHANGED_FILES" | grep -qE '\.dart$|pubspec\.yaml'; then
+    # Check if Flutter or pure Dart
+    if [ -f "pubspec.yaml" ] && grep -q "flutter:" "pubspec.yaml" 2>/dev/null; then
+        stacks+=("flutter")
+    else
+        stacks+=("dart")
+    fi
+fi
+if echo "$CHANGED_FILES" | grep -qE '\.py$|pyproject\.toml|requirements\.txt|setup\.py'; then
+    stacks+=("python")
+fi
+
+# Check if any stacks were detected
+stacks_str=$(printf '%s\n' "${stacks[@]}" | sort -u | tr '\n' ' ')
+if [ -z "$stacks_str" ]; then
+    exit 0
+fi
+
+# Build file extension pattern dynamically
+extensions=""
+for stack in $stacks_str; do
+    ext=$(get_extensions "$stack")
+    if [ -n "$ext" ]; then
+        extensions="$extensions,$ext"
+    fi
+done
+extensions=$(echo "$extensions" | sed 's/^,//' | tr ' ' ',')
+
+# Build lock file exclusion pattern
+lock_files=$(get_all_lock_files)
+lock_pattern=""
+for lock in $lock_files; do
+    if [ -z "$lock_pattern" ]; then
+        lock_pattern="$lock"
+    else
+        lock_pattern="$lock_pattern|$lock"
+    fi
+done
+
+# Filter for code files (exclude CLAUDE.md files and lock files)
+if [ -n "$lock_pattern" ]; then
+    CODE_FILES=$(echo "$CHANGED_FILES" | grep -E "\.(${extensions//,/|})$" | grep -v 'CLAUDE.md' | grep -v -E "$lock_pattern")
+else
+    CODE_FILES=$(echo "$CHANGED_FILES" | grep -E "\.(${extensions//,/|})$" | grep -v 'CLAUDE.md')
+fi
+
+# Skip if no code files changed
+if [ -z "$CODE_FILES" ]; then
+  exit 0
+fi
+
+# Skip if commit message contains [skip-docs] or [docs-skip]
+if echo "$COMMIT_MSG" | grep -qE '\[(skip-docs|docs-skip)\]'; then
+  echo -e "${YELLOW}📝 Skipping documentation check (commit message flag)${NC}"
+  exit 0
+fi
+
+echo -e "${BLUE}📚 Analyzing commit for documentation impact...${NC}"
+
+# Generate unique session ID for this analysis (allows resuming with edit permissions)
+SESSION_ID=$(generate_uuid)
+
+# Create logs directory
+LOGS_DIR=$(get_logs_dir)
+mkdir -p "$LOGS_DIR"
+
+# Build git pathspec for file extensions
+ext_patterns=""
+for stack in $stacks_str; do
+    ext=$(get_extensions "$stack")
+    IFS=',' read -ra EXT_ARRAY <<< "$ext"
+    for e in "${EXT_ARRAY[@]}"; do
+        ext_patterns="$ext_patterns '*.$e'"
+    done
+done
+
+# Build git pathspec for lock files exclusion
+lock_excludes=""
+for lock in $lock_files; do
+    lock_excludes="$lock_excludes ':!*$lock'"
+done
+
+# Get the actual diff (limit to 1000 lines to avoid huge context)
+DIFF=$(eval "git show HEAD --pretty=format: --unified=3 -- $ext_patterns ':!*CLAUDE.md' $lock_excludes" | head -1000)
+
+# Dynamically discover all CLAUDE.md files in the repository
+# Build exclude paths from all detected stacks
+# Note: stacks_str contains space-separated stack names
+all_exclude_paths=""
+for stack in $stacks_str; do
+    paths=$(get_exclude_paths "$stack")
+    for path in $paths; do
+        all_exclude_paths="$all_exclude_paths $path"
+    done
+done
+exclude_paths=$(echo "$all_exclude_paths" | tr ' ' '\n' | sort -u)
+find_excludes=""
+for path in $exclude_paths; do
+    find_excludes="$find_excludes -not -path '*/$path/*'"
+done
+
+# Find all CLAUDE.md files
+CLAUDE_MD_FILES=$(eval "find . -name 'CLAUDE.md' $find_excludes" | sort)
+CLAUDE_MD_LIST=""
+COUNTER=1
+while IFS= read -r file; do
+  if [ -n "$file" ]; then
+    CLAUDE_MD_LIST="${CLAUDE_MD_LIST}${COUNTER}. \`${file}\`\n"
+    COUNTER=$((COUNTER + 1))
+  fi
+done <<< "$CLAUDE_MD_FILES"
+
+# Create the prompt for Claude
+PROMPT="# CLAUDE.md Documentation Check
+
+## Commit Information
+**Hash:** $COMMIT_HASH
+**Message:** $COMMIT_MSG
+
+## Changed Files
+\`\`\`
+$CODE_FILES
+\`\`\`
+
+## Your Task
+Analyze the changes below and determine if any CLAUDE.md documentation files need updating.
+
+## Available CLAUDE.md Files (auto-discovered)
+$(echo -e "$CLAUDE_MD_LIST")
+
+## Update Criteria
+✅ **Update needed if:**
+- New files/components/hooks added
+- Public API signatures changed
+- Architecture patterns changed
+- New dependencies introduced
+- Performance characteristics changed
+- File organization changed
+
+❌ **Skip if:**
+- Internal implementation details (API unchanged)
+- Bug fixes without pattern changes
+- Formatting/linting only
+- Test-only changes (unless test patterns changed)
+- Package.json dependency version bumps (unless new deps)
+
+## Output Format
+Provide ONLY:
+
+1. **Status:** Either \"NO_UPDATE_NEEDED\" or \"UPDATE_RECOMMENDED\"
+
+2. **If UPDATE_RECOMMENDED, list affected files:**
+   - File: path/to/CLAUDE.md
+   - Reason: Brief explanation
+   - Changes: Specific sections to update
+
+## Git Diff
+\`\`\`diff
+$DIFF
+\`\`\`
+
+## Final Instructions
+Be concise. Focus on whether the changes affect the documented architecture, patterns, or public APIs. Minor implementation details don't need documentation updates."
+
+# Run Claude CLI in headless mode with optimized settings
+# Get configuration values
+CLAUDE_MODEL=$(get_claude_model)
+CLAUDE_MAX_TURNS=$(get_claude_max_turns)
+
+# Run Claude and capture output to temp file to avoid shell escaping issues
+TEMP_OUTPUT=$(mktemp)
+echo "$PROMPT" | claude -p \
+  --model "$CLAUDE_MODEL" \
+  --max-turns "$CLAUDE_MAX_TURNS" \
+  --tools "Read,Grep,Glob" \
+  --output-format json \
+  --session-id "$SESSION_ID" \
+  > "$TEMP_OUTPUT" 2>&1
+
+# Check if Claude produced output
+if [ ! -s "$TEMP_OUTPUT" ]; then
+  echo -e "${RED}❌ Claude CLI produced no output${NC}"
+  rm -f "$TEMP_OUTPUT"
+  exit 1
+fi
+
+# Save analysis output to log file for debugging/auditing (pretty-printed)
+ANALYSIS_LOG="${LOGS_DIR}/claude_analysis_${SESSION_ID}.json"
+if python3 -c "import sys, json; print(json.dumps(json.load(open('$TEMP_OUTPUT')), indent=2))" > "$ANALYSIS_LOG" 2>/dev/null; then
+  : # Pretty-printing succeeded
+else
+  # Fallback to raw output if pretty-printing fails
+  cp "$TEMP_OUTPUT" "$ANALYSIS_LOG"
+fi
+
+# Parse Claude's result from JSON output
+CLAUDE_RESULT=$(python3 -c "import sys, json; data = json.load(open('$TEMP_OUTPUT')); print(data.get('result', ''))" 2>/dev/null || cat "$TEMP_OUTPUT")
+rm -f "$TEMP_OUTPUT"
+
+# Check if Claude found updates needed
+if echo "$CLAUDE_RESULT" | grep -q "UPDATE_RECOMMENDED"; then
+  echo -e "${YELLOW}⚠️  Documentation update recommended!${NC}"
+  echo ""
+
+  # Extract file recommendations from output
+  FILES_INFO=$(echo "$CLAUDE_RESULT" | grep -A 2 "File:" | head -20)
+
+  # Show summary in terminal
+  echo "$FILES_INFO"
+  echo ""
+  echo -e "${BLUE}📋 Analysis log: $ANALYSIS_LOG${NC}"
+  echo ""
+
+  # Build dialog message
+  DIALOG_MSG="Claude detected code changes that affect documentation.\n\n"
+  DIALOG_MSG+="Files needing updates:\n"
+  DIALOG_MSG+=$(echo "$FILES_INFO" | grep "File:" | sed 's/- /• /' | head -5)
+  DIALOG_MSG+="\n\nWould you like Claude to update them automatically in the background?"
+
+  # Show macOS dialog with buttons
+  CHOICE=$(osascript <<APPLESCRIPT 2>/dev/null
+tell application "System Events"
+  display dialog "$DIALOG_MSG" buttons {"Skip this time", "Update now in BG"} default button 2 with title "CLAUDE.md Updates Needed" with icon caution
+  return button returned
+end tell
+APPLESCRIPT
+  )
+
+  # Handle user choice
+  if echo "$CHOICE" | grep -q "Update now in BG"; then
+    echo -e "${GREEN}🚀 Launching background update...${NC}"
+    echo "   Session ID: $SESSION_ID"
+    LOGS_DIR=$(get_logs_dir)
+    echo "   Monitor: tail -f $LOGS_DIR/claude_update_${SESSION_ID}.json"
+
+    # Launch background update script
+    .husky/scripts/claude-update-docs.sh "$SESSION_ID" &
+
+    # Show initial notification (cross-platform)
+    send_notification "Claude Code" "Updating CLAUDE.md files in background..."
+  else
+    echo -e "${YELLOW}⏭️  Skipped automatic update${NC}"
+    echo -e "${GREEN}💡 You can manually update or re-run with:${NC}"
+    echo -e "${GREEN}   .husky/scripts/claude-update-docs.sh $SESSION_ID${NC}"
+  fi
+
+elif echo "$CLAUDE_RESULT" | grep -q "NO_UPDATE_NEEDED"; then
+  echo -e "${GREEN}✅ No documentation updates needed.${NC}"
+  echo -e "${BLUE}📋 Analysis log: $ANALYSIS_LOG${NC}"
+else
+  # Unexpected output format - show what we got
+  echo -e "${YELLOW}⚠️  Claude analysis completed (unexpected format):${NC}"
+  echo "$CLAUDE_RESULT" | head -20
+  echo -e "${BLUE}📋 Full analysis log: $ANALYSIS_LOG${NC}"
+fi
