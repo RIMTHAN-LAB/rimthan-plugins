@@ -38,6 +38,31 @@
         "agents/nodejs-expert.md",
         "hooks/hooks.json"
       ]
+    },
+    "git-hooks": {
+      "name": "Git Hooks",
+      "description": "Universal Husky git hooks with multi-language support and CLAUDE.md automation",
+      "version": "1.0.0",
+      "files": [
+        "README.md",
+        "config/config.example.json",
+        "config/config.json",
+        "docs/IMPLEMENTATION_SUMMARY.md",
+        "docs/README.md",
+        "docs/SCRIPTS_README.md",
+        "docs/WORKFLOW_DIAGRAM_UNIVERSAL.md",
+        "install.sh",
+        "lib/config.sh",
+        "lib/detect-env.sh",
+        "lib/notify.py",
+        "lib/platform.sh",
+        "lib/uuid.py",
+        "post-commit",
+        "pre-commit",
+        "pre-push",
+        "scripts/check-docs-interactive.sh",
+        "scripts/claude-update-docs.sh"
+      ]
     }
   }
 }
