@@ -45,8 +45,8 @@ claude -p \
 python3 -c "import sys, json; print(json.dumps(json.load(open('$TEMP_OUTPUT')), indent=2))" > "$OUTPUT_FILE" 2>/dev/null || cp "$TEMP_OUTPUT" "$OUTPUT_FILE"
 rm -f "$TEMP_OUTPUT"
 
-# Check if successful
-if grep -q '"subtype":"success"' "$OUTPUT_FILE"; then
+# Check if successful (handle both compact and pretty-printed JSON)
+if grep -q '"subtype"[[:space:]]*:[[:space:]]*"success"' "$OUTPUT_FILE"; then
   # Success notification (cross-platform)
   send_notification "Claude Code Update" "CLAUDE.md files updated successfully! Review changes with: git diff"
 
@@ -65,7 +65,7 @@ else
   echo "Check log: $OUTPUT_FILE"
 
   # Extract error if available
-  if grep -q '"subtype":"error"' "$OUTPUT_FILE"; then
+  if grep -q '"subtype"[[:space:]]*:[[:space:]]*"error"' "$OUTPUT_FILE"; then
     ERROR_MSG=$(grep -o '"message":"[^"]*"' "$OUTPUT_FILE" | head -1 | cut -d'"' -f4)
     echo "Error: $ERROR_MSG"
   fi
