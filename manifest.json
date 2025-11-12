@@ -17,13 +17,17 @@
     "flutter": {
       "name": "Flutter",
       "description": "Claude Code plugin for Flutter development with Dart",
-      "version": "1.0.0",
+      "version": "1.0.2",
       "files": [
         ".claude-plugin/plugin.json",
         "commands/widget.md",
         "commands/screen.md",
         "commands/model.md",
-        "agents/flutter-expert.md"
+        "agents/flutter-expert.md",
+        "skills/bloc-state-management/SKILL.md",
+        "skills/flutter-developer/SKILL.md",
+        "skills/flutter-plugin/SKILL.md",
+        "skills/riverpod-state-management/SKILL.md"
       ]
     },
     "nodejs": {
