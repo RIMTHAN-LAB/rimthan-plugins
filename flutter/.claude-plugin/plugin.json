@@ -1,8 +1,64 @@
 {
-  "name": "flutter-plugin",
-  "displayName": "Flutter Development Plugin",
-  "description": "Custom commands and agents for Flutter development with Dart",
+  "name": "Flutter Development Plugin",
   "version": "1.0.0",
+  "description": "Comprehensive Flutter development tools including slash commands, agents, and skills for building production-ready Flutter applications with state management, localization, and theming support.",
   "author": "RIMTHAN-LAB",
-  "repository": "https://github.com/RIMTHAN-LAB/rimthan-plugins"
+  "repository": "https://github.com/RIMTHAN-LAB/rimthan-plugins",
+  "keywords": [
+    "flutter",
+    "dart",
+    "mobile",
+    "state-management",
+    "riverpod",
+    "bloc",
+    "localization",
+    "theming",
+    "material3",
+    "taskmaster"
+  ],
+  "features": {
+    "commands": {
+      "count": 54,
+      "categories": [
+        "Task Management (Taskmaster)",
+        "Project Initialization",
+        "Code Generation",
+        "Dependency Management",
+        "Status Updates",
+        "PRD Parsing",
+        "Workflows"
+      ]
+    },
+    "agents": {
+      "count": 10,
+      "types": [
+        "Spec workflow agents (requirements, design, tasks, test, implementation, judge)",
+        "Task orchestration agents (checker, executor, orchestrator)",
+        "System prompt loader"
+      ]
+    },
+    "skills": {
+      "count": 4,
+      "available": [
+        "Flutter Developer",
+        "Flutter Reviewer",
+        "Riverpod State Management",
+        "BLoC State Management"
+      ]
+    },
+    "systemPrompts": {
+      "count": 1,
+      "available": [
+        "Spec Workflow Starter"
+      ]
+    }
+  },
+  "requirements": {
+    "flutter": ">=3.0.0",
+    "dart": ">=3.0.0"
+  },
+  "documentation": {
+    "guide": "TM_COMMANDS_GUIDE.md",
+    "commands": "See commands/tm/ directory for individual command documentation"
+  }
 }
